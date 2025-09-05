@@ -101,10 +101,35 @@ function convertApiPromptToPrompt(apiPrompt: ApiPromptResponse): Prompt {
   };
 }
 
+// Helper function to generate model compatibility warnings
+function generateModelWarning(models: { recommended: string[], compatible: string[] }): string {
+  if (models.recommended.length === 0 && models.compatible.length === 0) {
+    return `⚠️ **MODEL WARNING**: No specific model requirements - should work with current model`;
+  }
+  
+  const recommended = models.recommended.join(', ');
+  const compatible = models.compatible.join(', ');
+  
+  let warning = '';
+  if (models.recommended.length > 0) {
+    warning += `🚨 **CRITICAL**: This prompt is OPTIMIZED for: ${recommended}`;
+    if (models.compatible.length > 0) {
+      warning += `\n⚠️ **COMPATIBLE** (but not optimal): ${compatible}`;
+    }
+    warning += `\n🔄 **RECOMMENDATION**: Switch to one of the recommended models for best results!`;
+  } else if (models.compatible.length > 0) {
+    warning += `✅ **COMPATIBLE**: Works with: ${compatible}`;
+  }
+  
+  return warning;
+}
+
 // Helper functions
-function formatPromptSummary(prompt: Prompt): string {
+function formatPromptSummary(prompt: Prompt, models?: { recommended: string[], compatible: string[] }): string {
+  const modelWarning = models ? `\n${generateModelWarning(models)}\n` : '';
+  
   return `🔥 **${prompt.name}** (v${prompt.version})
-📝 ${prompt.description}
+📝 ${prompt.description}${modelWarning}
 👤 By: ${prompt.author} | ⭐ ${prompt.rating}/5 | 📥 ${prompt.downloads.toLocaleString()} downloads
 🏷️ Tags: ${prompt.tags.join(', ')}
 📂 Category: ${prompt.category}
@@ -122,10 +147,43 @@ async function formatPromptFull(promptId: string): Promise<string> {
     const apiPrompt = response.data;
     const prompt = convertApiPromptToPrompt(apiPrompt);
     
-    return `# ${prompt.name} v${prompt.version}
+    // Generate extreme model warning
+    const modelWarning = generateModelWarning(apiPrompt.content.cvibe.models);
+    const hasRecommendedModels = apiPrompt.content.cvibe.models.recommended.length > 0;
+    
+    let extremeWarning = '';
+    if (hasRecommendedModels) {
+      extremeWarning = `
+
+🚨🚨🚨 **EXTREME MODEL WARNING** 🚨🚨🚨
+═══════════════════════════════════════════
+${modelWarning}
+
+⚡ **PERFORMANCE IMPACT**: Using non-recommended models may result in:
+   • Significantly reduced prompt effectiveness
+   • Unexpected or suboptimal outputs  
+   • Poor quality results
+   
+💡 **ACTION REQUIRED**: Please consider switching to a recommended model
+   for optimal results with this prompt!
+═══════════════════════════════════════════
+
+`;
+    }
+    
+    return `# ${prompt.name} v${prompt.version}${extremeWarning}
 
 ## Usage Guide
 ${apiPrompt.readme}
+
+## 🎯 Model Compatibility Analysis
+${modelWarning}
+
+${hasRecommendedModels ? `
+⚠️ **CRITICAL NOTICE**: This prompt has been specifically optimized and tested 
+with the recommended models listed above. Using other models is not recommended 
+and may significantly impact performance and results quality.
+` : ''}
 
 ## Metadata
 - **Author**: ${prompt.author}
@@ -138,10 +196,6 @@ ${apiPrompt.readme}
 - **License**: ${prompt.license}
 - **Created**: ${new Date(prompt.createdAt).toLocaleDateString()}
 - **Updated**: ${new Date(prompt.updatedAt).toLocaleDateString()}
-
-## Model Compatibility
-- **Recommended**: ${apiPrompt.content.cvibe.models.recommended.join(', ')}
-- **Compatible**: ${apiPrompt.content.cvibe.models.compatible.join(', ')}
 
 ## Required Inputs
 ${apiPrompt.content.cvibe.inputs.length > 0 
@@ -191,24 +245,47 @@ async function searchPromptsAdvanced(
     // Make API call to get prompts
     const response = await apiClient.get<ApiPromptsListResponse>('/prompts', { params });
     let results = response.data.prompts.map(convertApiPromptToPrompt);
+    let apiResults = response.data.prompts; // Keep original API results for model data
 
     // Apply client-side filters (since API doesn't support all filters yet)
     if (category && PROMPT_CATEGORIES.includes(category as PromptCategory)) {
-      results = results.filter(p => p.category === category);
+      results = results.filter((p, i) => {
+        const keep = p.category === category;
+        if (!keep) {
+          apiResults.splice(i, 1);
+        }
+        return keep;
+      });
     }
 
     if (difficulty) {
-      results = results.filter(p => p.difficulty === difficulty);
+      results = results.filter((p, i) => {
+        const keep = p.difficulty === difficulty;
+        if (!keep) {
+          apiResults.splice(i, 1);
+        }
+        return keep;
+      });
     }
 
     if (minRating !== undefined) {
-      results = results.filter(p => p.rating >= minRating);
+      results = results.filter((p, i) => {
+        const keep = p.rating >= minRating;
+        if (!keep) {
+          apiResults.splice(i, 1);
+        }
+        return keep;
+      });
     }
 
     // Sort by rating since we don't have download counts yet
-    results = results
-      .sort((a, b) => b.rating - a.rating)
+    const sortedIndices = results
+      .map((p, i) => ({ prompt: p, apiPrompt: apiResults[i], index: i }))
+      .sort((a, b) => b.prompt.rating - a.prompt.rating)
       .slice(0, limit);
+
+    results = sortedIndices.map(item => item.prompt);
+    apiResults = sortedIndices.map(item => item.apiPrompt);
 
     if (results.length === 0) {
       return `No prompts found matching your criteria.
@@ -220,10 +297,28 @@ Try:
 - Check available categories: ${PROMPT_CATEGORIES.join(', ')}`;
     }
 
-    const formatted = results.map(formatPromptSummary).join('\n\n---\n\n');
+    // Check if any prompts have model requirements
+    const hasModelRequirements = apiResults.some(api => 
+      api.content.cvibe.models.recommended.length > 0 || 
+      api.content.cvibe.models.compatible.length > 0
+    );
+
+    let modelNotice = '';
+    if (hasModelRequirements) {
+      modelNotice = `
+🚨 **MODEL COMPATIBILITY NOTICE** 🚨
+Some prompts have specific model requirements. Look for model warnings in the results below.
+Use 'cvibe get <prompt-id>' for detailed model compatibility information.
+
+`;
+    }
+
+    const formatted = results.map((prompt, index) => 
+      formatPromptSummary(prompt, apiResults[index].content.cvibe.models)
+    ).join('\n\n---\n\n');
     
     return `Found ${results.length} prompt${results.length === 1 ? '' : 's'} (from ${response.data.total} total):
-
+${modelNotice}
 ${formatted}
 
 💡 Use 'cvibe get <prompt-id>' to view the full prompt content!
