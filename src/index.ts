@@ -9,6 +9,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import Fuse from 'fuse.js';
 import axios from 'axios';
+import { writeFileSync } from 'fs';
 import { 
   PROMPT_CATEGORIES, 
   type Prompt, 
@@ -216,6 +217,157 @@ ${prompt.content}${generateAIModelRecommendationSnippet(apiPrompt.content.cvibe.
   }
 }
 
+// Initialize prompt package function
+async function initializePromptPackage(
+  name: string,
+  author: string, 
+  description: string,
+  category: string,
+  difficulty: 'beginner' | 'intermediate' | 'advanced',
+  tags: string[],
+  license: string,
+  language?: string,
+  framework?: string
+): Promise<string> {
+  try {
+    // Create the package structure based on the API schema
+    const packageData = {
+      name: name,
+      readme: `# ${name}\n\n${description}\n\n## How to use\n\n1. Replace {input} with your content\n2. Run with your favorite AI model\n3. Enjoy the results!\n\n*Made by ${author}*`,
+      content: {
+        cvibe: {
+          tags: tags,
+          inputs: [
+            {
+              name: 'input',
+              type: 'string', 
+              required: true,
+              description: 'Your main input - customize this!'
+            }
+          ],
+          models: {
+            compatible: [],
+            recommended: []
+          },
+          category: category,
+          language: language,
+          framework: framework,
+          difficulty: difficulty
+        },
+        author: author,
+        prompt: 'You are a helpful assistant. Please help with: {input}',
+        license: license,
+        description: description
+      }
+    };
+
+    // Generate the package file content
+    const packageJson = JSON.stringify(packageData, null, 2);
+    
+    // Write the file to disk
+    const filename = 'cvibe-package.json';
+    try {
+      writeFileSync(filename, packageJson, 'utf8');
+    } catch (writeError) {
+      throw new Error(`Failed to create ${filename}: ${writeError instanceof Error ? writeError.message : 'Unknown error'}`);
+    }
+    
+    return `🎉 **${name}** initialized!
+
+📁 **cvibe-package.json** created successfully
+👤 ${author} • 📂 ${category} • 🎯 ${difficulty}${language ? ` • 🔤 ${language}` : ''}${framework ? ` • 🚀 ${framework}` : ''}
+
+**Next steps:**
+1. **Edit your prompt** - Replace the default prompt text in cvibe-package.json
+2. **Add inputs** - Define what variables your prompt needs  
+3. **Pick models** - Add compatible AI models
+4. **Publish** - \`cvibe publish\` when ready
+
+✅ **File created:** \`cvibe-package.json\` is ready for editing!`;
+  } catch (error) {
+    throw error;
+  }
+}
+
+// Publish prompt package function
+async function publishPromptPackage(
+  packageFile?: string,
+  packageContent?: string
+): Promise<string> {
+  try {
+    let packageData: any;
+    
+    if (packageContent) {
+      // Parse the provided JSON content
+      try {
+        packageData = JSON.parse(packageContent);
+      } catch (parseError) {
+        throw new Error('Invalid JSON format in packageContent');
+      }
+    } else {
+      // Use default file or provided file path
+      const filePath = packageFile || 'cvibe-package.json';
+      throw new Error(`Reading files is not supported in MCP context. Please provide the package content directly using the 'packageContent' parameter instead of 'packageFile'.
+
+To publish your package:
+1. Copy the content of your ${filePath} file
+2. Use cvibe_publish with packageContent parameter containing the JSON content`);
+    }
+
+    // Validate required fields match API schema
+    if (!packageData.name || !packageData.readme || !packageData.content) {
+      throw new Error('Package must contain "name", "readme", and "content" fields');
+    }
+
+    const { content } = packageData;
+    if (!content.cvibe || !content.author || !content.prompt || !content.description) {
+      throw new Error('Package content must contain "cvibe", "author", "prompt", and "description" fields');
+    }
+
+    const { cvibe } = content;
+    if (!cvibe.tags || !cvibe.models || !cvibe.category || !cvibe.difficulty) {
+      throw new Error('CVibe metadata must contain "tags", "models", "category", and "difficulty" fields');
+    }
+
+    // Make API call to publish the prompt
+    const response = await apiClient.post('/prompts', packageData);
+    
+    if (response.status === 201) {
+      const publishedPrompt = response.data;
+      return `🎉 Prompt published successfully!
+
+📦 **${publishedPrompt.name}**
+🆔 ID: \`${publishedPrompt.id}\`
+👤 Author: ${publishedPrompt.content.author}
+📂 Category: ${publishedPrompt.content.cvibe.category}
+🎯 Difficulty: ${publishedPrompt.content.cvibe.difficulty}
+📅 Published: ${new Date(publishedPrompt.createdAt).toLocaleDateString()}
+
+✅ Your prompt is now live in the CVibe registry!
+🔍 Users can find it with: \`cvibe search ${publishedPrompt.name}\`
+📋 Or get it directly with: \`cvibe get ${publishedPrompt.id}\`
+
+🌟 Share your prompt ID: **${publishedPrompt.id}**`;
+    } else {
+      throw new Error(`Unexpected response status: ${response.status}`);
+    }
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.code === 'ECONNREFUSED') {
+        return `❌ Cannot connect to CVibe API at ${API_BASE_URL}. Please ensure the API server is running.`;
+      }
+      if (error.response?.status === 400) {
+        const errorData = error.response.data;
+        return `❌ Validation Error: ${errorData.message || 'Invalid package format'}
+
+Please check your package structure and ensure all required fields are properly filled.`;
+      }
+      return `❌ API Error: ${error.response?.data?.error || error.message}`;
+    }
+    return `❌ Error publishing prompt: ${error instanceof Error ? error.message : 'Unknown error'}`;
+  }
+}
+
 // Tool implementations
 async function searchPromptsAdvanced(
   query: string, 
@@ -402,6 +554,73 @@ const tools: Tool[] = [
       required: ['promptId'],
     },
   },
+  {
+    name: 'cvibe_init',
+    description: 'Initialize a new prompt package for CVibe registry',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Package name (e.g., "my-awesome-prompt")',
+        },
+        author: {
+          type: 'string',
+          description: 'Author name',
+        },
+        description: {
+          type: 'string',
+          description: 'Brief description of what this prompt does',
+        },
+        category: {
+          type: 'string',
+          description: 'Prompt category',
+          enum: ['code-generation', 'debugging', 'documentation', 'testing', 'refactoring', 'architecture', 'security', 'performance', 'ui-ux', 'data-analysis', 'devops', 'api-design', 'database', 'mobile', 'web', 'machine-learning', 'general'],
+        },
+        difficulty: {
+          type: 'string',
+          description: 'Difficulty level',
+          enum: ['beginner', 'intermediate', 'advanced'],
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of tags (e.g., ["react", "typescript"])',
+        },
+        language: {
+          type: 'string',
+          description: 'Programming language (optional)',
+        },
+        framework: {
+          type: 'string',
+          description: 'Framework (optional)',
+        },
+        license: {
+          type: 'string',
+          description: 'License (e.g., "MIT", "Apache-2.0", "GPL-3.0")',
+        },
+      },
+      required: ['name', 'author', 'description', 'category', 'difficulty', 'tags', 'license'],
+    },
+  },
+  {
+    name: 'cvibe_publish',
+    description: 'Publish a prompt package to the CVibe registry',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        packageFile: {
+          type: 'string',
+          description: 'Path to the package JSON file (optional, defaults to "cvibe-package.json")',
+        },
+        packageContent: {
+          type: 'string',
+          description: 'Direct JSON content of the package (alternative to packageFile)',
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 // Set up request handlers
@@ -429,6 +648,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'cvibe_get': {
         const { promptId } = args as { promptId: string };
         const result = await getPrompt(promptId);
+        return { content: [{ type: 'text', text: result }] };
+      }
+
+      case 'cvibe_init': {
+        const { name, author, description, category, difficulty, tags, license, language, framework } = args as {
+          name: string;
+          author: string;
+          description: string;
+          category: string;
+          difficulty: 'beginner' | 'intermediate' | 'advanced';
+          tags: string[];
+          license: string;
+          language?: string;
+          framework?: string;
+        };
+        const result = await initializePromptPackage(name, author, description, category, difficulty, tags, license, language, framework);
+        return { content: [{ type: 'text', text: result }] };
+      }
+
+      case 'cvibe_publish': {
+        const { packageFile, packageContent } = args as {
+          packageFile?: string;
+          packageContent?: string;
+        };
+        const result = await publishPromptPackage(packageFile, packageContent);
         return { content: [{ type: 'text', text: result }] };
       }
 
