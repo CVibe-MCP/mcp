@@ -57,10 +57,6 @@ interface ApiPromptResponse {
         required: boolean;
         description: string;
       }>;
-      quality: {
-        success_rate: number;
-        last_verified: string;
-      };
     };
     description: string;
     originalId?: string;
@@ -90,8 +86,8 @@ function convertApiPromptToPrompt(apiPrompt: ApiPromptResponse): Prompt {
     tags: cvibe.tags || [],
     author: apiPrompt.content.author || 'Anonymous',
     version: apiPrompt.content.version || '1.0.0',
-    downloads: Math.floor(cvibe.quality.success_rate * 10000), // Simulate downloads based on success rate
-    rating: cvibe.rating || 0,
+    downloads: 0, // No download tracking in current DB
+    rating: 0,
     language: cvibe.language,
     framework: cvibe.framework,
     difficulty: cvibe.difficulty || 'beginner',
@@ -101,36 +97,48 @@ function convertApiPromptToPrompt(apiPrompt: ApiPromptResponse): Prompt {
   };
 }
 
-// Helper function to generate model compatibility warnings
-function generateModelWarning(models: { recommended: string[], compatible: string[] }): string {
+
+
+
+// Helper function to generate AI-powered model recommendation snippet for prompt content
+function generateAIModelRecommendationSnippet(models: { recommended: string[], compatible: string[] }): string {
   if (models.recommended.length === 0 && models.compatible.length === 0) {
-    return `⚠️ **MODEL WARNING**: No specific model requirements - should work with current model`;
+    return '';
   }
   
   const recommended = models.recommended.join(', ');
   const compatible = models.compatible.join(', ');
   
-  let warning = '';
+  let snippet = '\n\n--- AI AGENT MODEL CHECK ---\n';
+  snippet += 'Before proceeding with this prompt, please check what model you are running on and provide a model recommendation to the user:\n\n';
+  
   if (models.recommended.length > 0) {
-    warning += `🚨 **CRITICAL**: This prompt is OPTIMIZED for: ${recommended}`;
-    if (models.compatible.length > 0) {
-      warning += `\n⚠️ **COMPATIBLE** (but not optimal): ${compatible}`;
-    }
-    warning += `\n🔄 **RECOMMENDATION**: Switch to one of the recommended models for best results!`;
-  } else if (models.compatible.length > 0) {
-    warning += `✅ **COMPATIBLE**: Works with: ${compatible}`;
+    snippet += `RECOMMENDED MODELS: ${recommended}\n`;
+    snippet += `COMPATIBLE MODELS: ${compatible.length > 0 ? compatible : 'Any model (not optimal)'}\n\n`;
+    snippet += 'Instructions for AI agent:\n';
+    snippet += '1. Check what model you are currently running on\n';
+    snippet += '2. If you are one of the RECOMMENDED models, tell the user: "✅ Perfect! You are using [YOUR_MODEL_NAME], which is optimized for this prompt."\n';
+    snippet += '3. If you are one of the COMPATIBLE models (but not recommended), tell the user: "⚠️ You are using [YOUR_MODEL_NAME]. This prompt will work, but for optimal results consider switching to: [RECOMMENDED_MODELS]"\n';
+    snippet += '4. If you are not in either list, tell the user: "🚨 WARNING: You are using [YOUR_MODEL_NAME]. This prompt is optimized for: [RECOMMENDED_MODELS]. Results may be suboptimal with your current model."\n';
+  } else {
+    snippet += `COMPATIBLE MODELS: ${compatible}\n\n`;
+    snippet += 'Instructions for AI agent:\n';
+    snippet += '1. Check what model you are currently running on\n';
+    snippet += '2. If you are one of the COMPATIBLE models, tell the user: "✅ You are using [YOUR_MODEL_NAME], which is compatible with this prompt."\n';
+    snippet += '3. If you are not in the compatible list, tell the user: "⚠️ You are using [YOUR_MODEL_NAME]. This prompt is tested with: [COMPATIBLE_MODELS]. Results may vary with your current model."\n';
   }
   
-  return warning;
+  snippet += '5. Always provide this model compatibility check at the beginning of your response before executing the main prompt.\n';
+  snippet += '--- END MODEL CHECK ---\n\n';
+  
+  return snippet;
 }
 
 // Helper functions
-function formatPromptSummary(prompt: Prompt, models?: { recommended: string[], compatible: string[] }): string {
-  const modelWarning = models ? `\n${generateModelWarning(models)}\n` : '';
-  
+function formatPromptSummary(prompt: Prompt): string {
   return `🔥 **${prompt.name}** (v${prompt.version})
-📝 ${prompt.description}${modelWarning}
-👤 By: ${prompt.author} | ⭐ ${prompt.rating}/5 | 📥 ${prompt.downloads.toLocaleString()} downloads
+📝 ${prompt.description}
+👤 By: ${prompt.author}
 🏷️ Tags: ${prompt.tags.join(', ')}
 📂 Category: ${prompt.category}
 🎯 Difficulty: ${prompt.difficulty}
@@ -147,49 +155,38 @@ async function formatPromptFull(promptId: string): Promise<string> {
     const apiPrompt = response.data;
     const prompt = convertApiPromptToPrompt(apiPrompt);
     
-    // Generate extreme model warning
-    const modelWarning = generateModelWarning(apiPrompt.content.cvibe.models);
-    const hasRecommendedModels = apiPrompt.content.cvibe.models.recommended.length > 0;
+    // Simple model information display
+    const models = apiPrompt.content.cvibe.models;
+    const hasRecommendedModels = models.recommended.length > 0;
     
-    let extremeWarning = '';
+    let modelInfo = '';
     if (hasRecommendedModels) {
-      extremeWarning = `
+      modelInfo = `
 
-🚨🚨🚨 **EXTREME MODEL WARNING** 🚨🚨🚨
-═══════════════════════════════════════════
-${modelWarning}
+## 🎯 Model Compatibility
+**Recommended models:** ${models.recommended.join(', ')}
+${models.compatible.length > 0 ? `**Compatible models:** ${models.compatible.join(', ')}` : ''}
 
-⚡ **PERFORMANCE IMPACT**: Using non-recommended models may result in:
-   • Significantly reduced prompt effectiveness
-   • Unexpected or suboptimal outputs  
-   • Poor quality results
-   
-💡 **ACTION REQUIRED**: Please consider switching to a recommended model
-   for optimal results with this prompt!
-═══════════════════════════════════════════
+`;
+    } else if (models.compatible.length > 0) {
+      modelInfo = `
+
+## 🎯 Model Compatibility
+**Compatible models:** ${models.compatible.join(', ')}
 
 `;
     }
     
-    return `# ${prompt.name} v${prompt.version}${extremeWarning}
+    return `# ${prompt.name} v${prompt.version}${modelInfo}
 
 ## Usage Guide
 ${apiPrompt.readme}
-
-## 🎯 Model Compatibility Analysis
-${modelWarning}
-
-${hasRecommendedModels ? `
-⚠️ **CRITICAL NOTICE**: This prompt has been specifically optimized and tested 
-with the recommended models listed above. Using other models is not recommended 
-and may significantly impact performance and results quality.
-` : ''}
 
 ## Metadata
 - **Author**: ${prompt.author}
 - **Category**: ${prompt.category}
 - **Difficulty**: ${prompt.difficulty}
-- **Rating**: ${prompt.rating}/5 (${prompt.downloads.toLocaleString()} simulated downloads)
+- **Downloads**: Not tracked in current version
 - **Tags**: ${prompt.tags.join(', ')}
 - **Language**: ${prompt.language || 'N/A'}
 - **Framework**: ${prompt.framework || 'N/A'}
@@ -204,13 +201,9 @@ ${apiPrompt.content.cvibe.inputs.length > 0
     ).join('\n')
   : 'No additional inputs required'}
 
-## Quality Metrics
-- **Success Rate**: ${(apiPrompt.content.cvibe.quality.success_rate * 100).toFixed(1)}%
-- **Last Verified**: ${apiPrompt.content.cvibe.quality.last_verified}
-
 ## Prompt Content
 \`\`\`
-${prompt.content}
+${prompt.content}${generateAIModelRecommendationSnippet(apiPrompt.content.cvibe.models)}
 \`\`\`
 
 ---
@@ -278,10 +271,10 @@ async function searchPromptsAdvanced(
       });
     }
 
-    // Sort by rating since we don't have download counts yet
+    // Sort by created date (newest first)
     const sortedIndices = results
       .map((p, i) => ({ prompt: p, apiPrompt: apiResults[i], index: i }))
-      .sort((a, b) => b.prompt.rating - a.prompt.rating)
+      .sort((a, b) => new Date(b.prompt.createdAt).getTime() - new Date(a.prompt.createdAt).getTime())
       .slice(0, limit);
 
     results = sortedIndices.map(item => item.prompt);
@@ -297,24 +290,10 @@ Try:
 - Check available categories: ${PROMPT_CATEGORIES.join(', ')}`;
     }
 
-    // Check if any prompts have model requirements
-    const hasModelRequirements = apiResults.some(api => 
-      api.content.cvibe.models.recommended.length > 0 || 
-      api.content.cvibe.models.compatible.length > 0
-    );
-
     let modelNotice = '';
-    if (hasModelRequirements) {
-      modelNotice = `
-🚨 **MODEL COMPATIBILITY NOTICE** 🚨
-Some prompts have specific model requirements. Look for model warnings in the results below.
-Use 'cvibe get <prompt-id>' for detailed model compatibility information.
 
-`;
-    }
-
-    const formatted = results.map((prompt, index) => 
-      formatPromptSummary(prompt, apiResults[index].content.cvibe.models)
+    const formatted = results.map(prompt => 
+      formatPromptSummary(prompt)
     ).join('\n\n---\n\n');
     
     return `Found ${results.length} prompt${results.length === 1 ? '' : 's'} (from ${response.data.total} total):
