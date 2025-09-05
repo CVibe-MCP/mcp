@@ -10,7 +10,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import Fuse from 'fuse.js';
 import axios from 'axios';
-import { writeFileSync } from 'fs';
+import { writeFileSync, readFileSync } from 'fs';
 import { 
   PROMPT_CATEGORIES, 
   type Prompt, 
@@ -315,11 +315,15 @@ async function publishPromptPackage(
     } else {
       // Use default file or provided file path
       const filePath = packageFile || 'cvibe-package.json';
-      throw new Error(`Reading files is not supported in MCP context. Please provide the package content directly using the 'packageContent' parameter instead of 'packageFile'.
-
-To publish your package:
-1. Copy the content of your ${filePath} file
-2. Use cvibe_publish with packageContent parameter containing the JSON content`);
+      try {
+        const fileContent = readFileSync(filePath, 'utf8');
+        packageData = JSON.parse(fileContent);
+      } catch (readError) {
+        if (readError instanceof Error && 'code' in readError && readError.code === 'ENOENT') {
+          throw new Error(`Package file '${filePath}' not found. Please ensure the file exists or provide the package content directly using the 'packageContent' parameter.`);
+        }
+        throw new Error(`Failed to read package file '${filePath}': ${readError instanceof Error ? readError.message : 'Unknown error'}`);
+      }
     }
 
     // Validate required fields match API schema
