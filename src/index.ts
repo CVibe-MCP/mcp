@@ -111,6 +111,7 @@ function formatPromptSummary(prompt: Prompt): string {
 🎯 Difficulty: ${prompt.difficulty}
 📅 Updated: ${new Date(prompt.updatedAt).toLocaleDateString()}
 📄 License: ${prompt.license}
+🆔 ID: \`${prompt.id}\`
 `;
 }
 
@@ -225,7 +226,8 @@ Try:
 
 ${formatted}
 
-💡 Use 'cvibe get <prompt-id>' to view the full prompt content!`;
+💡 Use 'cvibe get <prompt-id>' to view the full prompt content!
+📋 Copy the ID from the results above (e.g., \`${results[0]?.id || 'prompt-id'}\`)`;
   } catch (error) {
     if (axios.isAxiosError(error)) {
       if (error.code === 'ECONNREFUSED') {
