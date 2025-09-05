@@ -16,9 +16,16 @@ import {
   type PromptCategory
 } from './data/prompts.js';
 
-// API Configuration  
-const API_BASE_URL = process.env.CVIBE_API_URL || 'http://localhost:3000/api/v1';
-const API_TIMEOUT = 10000; // 10 seconds
+// API Configuration - can be overridden by command line arguments
+let API_BASE_URL = process.env.CVIBE_API_URL || 'http://localhost:3000/api/v1';
+const API_TIMEOUT = parseInt(process.env.CVIBE_API_TIMEOUT || '10000');
+
+// Parse command line arguments for configuration
+const args = process.argv.slice(2);
+const apiUrlArg = args.find(arg => arg.startsWith('--api-url='));
+if (apiUrlArg) {
+  API_BASE_URL = apiUrlArg.split('=')[1];
+}
 
 // Configure axios instance
 const apiClient = axios.create({
@@ -690,9 +697,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Start the server
 async function main() {
+  // MCP servers use stdio transport for communication with clients like Cursor
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error('🚀 CVibe MCP Server running - The npm for prompts is ready!');
+  console.error(`📡 Connected to API: ${API_BASE_URL}`);
 }
 
 main().catch((error) => {
