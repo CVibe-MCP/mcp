@@ -1,0 +1,18 @@
+apiVersion: v2
+name: cvibe-mcp-remote
+description: CVibe MCP Server - Remote HTTP/SSE server for mcp-remote access
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - mcp
+  - prompts
+  - ai
+  - model-context-protocol
+  - remote
+maintainers:
+  - name: CVibe Team
+    email: team@cvibe.dev
+home: https://cvibe.dev
+sources:
+  - https://github.com/cvibe/cvibe-mcp

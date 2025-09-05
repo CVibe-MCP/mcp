@@ -2,6 +2,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -697,11 +698,61 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Start the server
 async function main() {
-  // MCP servers use stdio transport for communication with clients like Cursor
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('🚀 CVibe MCP Server running - The npm for prompts is ready!');
-  console.error(`📡 Connected to API: ${API_BASE_URL}`);
+  // Check if we should run in HTTP mode (for mcp-remote)
+  const httpMode = process.env.MCP_HTTP_MODE === 'true' || args.includes('--http');
+  const port = parseInt(process.env.PORT || '3001');
+
+  if (httpMode) {
+    // HTTP/SSE mode for remote access (Kubernetes deployment)
+    const http = await import('http');
+    
+    const httpServer = http.createServer(async (req, res) => {
+      if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status: 'ok',
+          service: 'cvibe-mcp',
+          version: '1.0.0',
+          apiUrl: API_BASE_URL,
+          timestamp: new Date().toISOString()
+        }));
+        return;
+      }
+
+      // Handle MCP over SSE
+      if (req.url === '/sse') {
+        const transport = new SSEServerTransport('/sse', res);
+        await server.connect(transport);
+        return;
+      }
+
+      // Default response
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('CVibe MCP Server - Use /sse endpoint for MCP communication');
+    });
+
+    httpServer.listen(port, () => {
+      console.error(`🚀 CVibe MCP Server (HTTP mode) running on port ${port}`);
+      console.error(`📡 Connected to API: ${API_BASE_URL}`);
+      console.error(`🌐 SSE endpoint: http://localhost:${port}/sse`);
+      console.error(`💡 Use mcp-remote to connect from Cursor`);
+    });
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.error('🛑 Received SIGTERM, shutting down gracefully');
+      httpServer.close(() => {
+        process.exit(0);
+      });
+    });
+
+  } else {
+    // Stdio mode for local Cursor integration
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error('🚀 CVibe MCP Server (stdio mode) running - The npm for prompts is ready!');
+    console.error(`📡 Connected to API: ${API_BASE_URL}`);
+  }
 }
 
 main().catch((error) => {

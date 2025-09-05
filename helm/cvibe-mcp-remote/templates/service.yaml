@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cvibe-mcp-remote.fullname" . }}
+  labels:
+    {{- include "cvibe-mcp-remote.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "cvibe-mcp-remote.selectorLabels" . | nindent 4 }}
