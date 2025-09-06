@@ -37,31 +37,46 @@ export async function searchPromptsAdvanced(
 ): Promise<string> {
   try {
     const params = new URLSearchParams();
-    if (query) params.append('query', query);
-    if (category) params.append('category', category);
-    if (difficulty) params.append('difficulty', difficulty);
-    if (minRating !== undefined) params.append('minRating', minRating.toString());
+    if (query) params.append('search', query);
     params.append('limit', limit.toString());
 
-    const data = await makeApiRequest(`/prompts/search?${params.toString()}`);
+    const data = await makeApiRequest(`/prompts?${params.toString()}`);
     
     if (!data.prompts || data.prompts.length === 0) {
       return 'No prompts found matching your criteria.';
     }
 
-    let result = `Found ${data.prompts.length} prompt(s):\n\n`;
+    // Filter by category and difficulty on the client side since API doesn't support it yet
+    let filteredPrompts = data.prompts;
     
-    data.prompts.forEach((prompt: any, index: number) => {
+    if (category) {
+      filteredPrompts = filteredPrompts.filter((prompt: any) => 
+        prompt.content?.cvibe?.category?.toLowerCase() === category.toLowerCase()
+      );
+    }
+    
+    if (difficulty) {
+      filteredPrompts = filteredPrompts.filter((prompt: any) => 
+        prompt.content?.cvibe?.difficulty?.toLowerCase() === difficulty.toLowerCase()
+      );
+    }
+
+    if (filteredPrompts.length === 0) {
+      return 'No prompts found matching your criteria.';
+    }
+
+    let result = `Found ${filteredPrompts.length} prompt(s):\n\n`;
+    
+    filteredPrompts.forEach((prompt: any, index: number) => {
       result += `${index + 1}. **${prompt.name}** (ID: ${prompt.id})\n`;
-      result += `   Author: ${prompt.author}\n`;
-      result += `   Category: ${prompt.category}\n`;
-      result += `   Difficulty: ${prompt.difficulty}\n`;
-      result += `   Rating: ${prompt.rating || 'N/A'}/5\n`;
-      result += `   Description: ${prompt.description}\n`;
-      if (prompt.tags && prompt.tags.length > 0) {
-        result += `   Tags: ${prompt.tags.join(', ')}\n`;
+      result += `   Author: ${prompt.content?.author || 'N/A'}\n`;
+      result += `   Category: ${prompt.content?.cvibe?.category || 'N/A'}\n`;
+      result += `   Difficulty: ${prompt.content?.cvibe?.difficulty || 'N/A'}\n`;
+      result += `   Description: ${prompt.content?.description || 'N/A'}\n`;
+      if (prompt.content?.cvibe?.tags && prompt.content.cvibe.tags.length > 0) {
+        result += `   Tags: ${prompt.content.cvibe.tags.join(', ')}\n`;
       }
-      result += `   URL: ${prompt.url || 'N/A'}\n\n`;
+      result += `   Created: ${prompt.createdAt}\n\n`;
     });
 
     return result;
@@ -74,37 +89,38 @@ export async function searchPromptsAdvanced(
 // Get a specific prompt by ID
 export async function getPrompt(promptId: string): Promise<string> {
   try {
-    const data = await makeApiRequest(`/prompts/${promptId}`);
+    const prompt = await makeApiRequest(`/prompts/${promptId}`);
     
-    if (!data.prompt) {
+    if (!prompt) {
       return `❌ Prompt with ID "${promptId}" not found.`;
     }
 
-    const prompt = data.prompt;
     let result = `# ${prompt.name}\n\n`;
     result += `**ID:** ${prompt.id}\n`;
-    result += `**Author:** ${prompt.author}\n`;
-    result += `**Category:** ${prompt.category}\n`;
-    result += `**Difficulty:** ${prompt.difficulty}\n`;
-    result += `**Rating:** ${prompt.rating || 'N/A'}/5\n`;
-    result += `**Description:** ${prompt.description}\n\n`;
+    result += `**Author:** ${prompt.content?.author || 'N/A'}\n`;
+    result += `**Category:** ${prompt.content?.cvibe?.category || 'N/A'}\n`;
+    result += `**Difficulty:** ${prompt.content?.cvibe?.difficulty || 'N/A'}\n`;
+    result += `**Description:** ${prompt.content?.description || 'N/A'}\n\n`;
     
-    if (prompt.tags && prompt.tags.length > 0) {
-      result += `**Tags:** ${prompt.tags.join(', ')}\n\n`;
+    if (prompt.content?.cvibe?.tags && prompt.content.cvibe.tags.length > 0) {
+      result += `**Tags:** ${prompt.content.cvibe.tags.join(', ')}\n\n`;
     }
     
-    if (prompt.language) {
-      result += `**Language:** ${prompt.language}\n`;
+    if (prompt.content?.cvibe?.language) {
+      result += `**Language:** ${prompt.content.cvibe.language}\n`;
     }
-    if (prompt.framework) {
-      result += `**Framework:** ${prompt.framework}\n`;
+    if (prompt.content?.cvibe?.framework) {
+      result += `**Framework:** ${prompt.content.cvibe.framework}\n`;
     }
     
-    result += `\n**Content:**\n\`\`\`\n${prompt.content}\n\`\`\`\n`;
+    result += `\n**Prompt Content:**\n\`\`\`\n${prompt.content?.prompt || 'N/A'}\n\`\`\`\n`;
     
-    if (prompt.url) {
-      result += `\n**URL:** ${prompt.url}\n`;
+    if (prompt.content?.license) {
+      result += `\n**License:** ${prompt.content.license}\n`;
     }
+    
+    result += `\n**Created:** ${prompt.createdAt}\n`;
+    result += `**Updated:** ${prompt.updatedAt}\n`;
 
     return result;
   } catch (error) {
@@ -188,21 +204,43 @@ export async function publishPromptPackage(packageFile?: string, packageContent?
       return `❌ Missing required fields: ${missingFields.join(', ')}`;
     }
 
-    // Add prompt content if not present
-    if (!packageData.content) {
-      packageData.content = `# ${packageData.name}\n\n${packageData.description}\n\n<!-- Add your prompt content here -->`;
-    }
+    // Transform package data to match API format
+    const apiData = {
+      name: packageData.name,
+      readme: packageData.description, // Use description as readme for now
+      content: {
+        cvibe: {
+          tags: packageData.tags || [],
+          inputs: [], // Empty for now, can be added later
+          models: {
+            compatible: ['claude-3', 'gpt-4', 'gpt-3.5-turbo'],
+            recommended: ['claude-3']
+          },
+          category: packageData.category,
+          language: packageData.language,
+          framework: packageData.framework,
+          difficulty: packageData.difficulty
+        },
+        author: packageData.author,
+        prompt: packageData.content || `# ${packageData.name}\n\n${packageData.description}`,
+        license: packageData.license,
+        description: packageData.description
+      }
+    };
 
     // Publish to API
     const response = await makeApiRequest('/prompts', {
       method: 'POST',
-      body: JSON.stringify(packageData),
+      body: JSON.stringify(apiData),
     });
 
     return `✅ Prompt package published successfully!\n\n` +
-           `📦 Package: ${packageData.name} v${packageData.version}\n` +
-           `🆔 ID: ${response.prompt?.id || 'N/A'}\n` +
-           `🌐 URL: ${response.prompt?.url || 'N/A'}\n\n` +
+           `📦 Package: ${response.name}\n` +
+           `🆔 ID: ${response.id}\n` +
+           `📝 Description: ${response.content?.description}\n` +
+           `🏷️ Category: ${response.content?.cvibe?.category}\n` +
+           `⚡ Difficulty: ${response.content?.cvibe?.difficulty}\n` +
+           `📅 Created: ${response.createdAt}\n\n` +
            `Your prompt is now available in the CVibe registry!`;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
