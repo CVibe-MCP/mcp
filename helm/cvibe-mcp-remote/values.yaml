@@ -25,7 +25,9 @@ ingress:
   hosts:
     - host: mcp.cvibe.dev
       paths:
-        - path: /
+        - path: /mcp
+          pathType: Prefix
+        - path: /health
           pathType: Prefix
   tls:
     - secretName: mcp-cvibe-dev-tls
