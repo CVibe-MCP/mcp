@@ -1,11 +1,20 @@
-# CVibe MCP Server
+# cvibe MCP Server
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![cvibe Hub](https://img.shields.io/badge/cvibe-Hub-blue?logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K)](https://cvibe.dev)
 
-> **The npm for prompts** — Access millions of open-source, field-tested prompts through Model Context Protocol
+> **The Free AI Prompt Hub** — Discover and share community-built prompts for ChatGPT, Claude, Gemini and more
 
-CVibe MCP is a Model Context Protocol server that brings the power of the [CVibe prompt registry](https://cvibe.dev) directly into your development workflow. No more scattered Google Docs, screenshots, or one-off hacks. Every prompt is versioned, standardized, and MCP-native.
+🌟 **[Browse Free Prompts on cvibe.dev →](https://cvibe.dev)**
+
+cvibe MCP is a Model Context Protocol server that connects you to **the free, community-driven prompt library**. Built by developers, for developers - no more scattered Google Docs, screenshots, or reinventing prompts. Every prompt is tested, versioned, and ready to use.
+
+**🎯 Why Choose cvibe?**
+- **100% Free & Open Source** - No subscriptions, no paywalls
+- **Community Driven** - Real prompts from real developers
+- **Works Everywhere** - ChatGPT, Claude, Gemini, Cursor, VSCode
+- **Quality Guaranteed** - Every prompt is tested and rated by the community
 
 ## ✨ Features
 
@@ -30,7 +39,7 @@ No installation needed! Use the remote MCP server directly in your configuration
 **For Local Development:**
 ```bash
 # Clone the repository
-git clone https://github.com/CVibe-MCP/mcp.git
+git clone https://github.com/cvibe-MCP/mcp.git
 cd mcp
 
 # Install dependencies
@@ -42,7 +51,7 @@ npm run build
 
 ### Configuration
 
-Add CVibe to your MCP configuration file:
+Add cvibe to your MCP configuration file:
 
 **For Cursor IDE** (`~/.cursor/mcp.json`):
 
@@ -124,7 +133,7 @@ Initialize a new TypeScript debugging prompt package, then publish it to the reg
 
 ```bash
 # Clone the repository
-git clone https://github.com/CVibe-MCP/mcp.git
+git clone https://github.com/cvibe-MCP/mcp.git
 cd mcp
 
 # Install dependencies
@@ -150,17 +159,25 @@ We welcome contributions! Here's how you can help:
 - Follow the existing code style and patterns
 - Update documentation as needed
 
-## 📚 Documentation
+## 📚 Documentation & Community
 
-- [CVibe Website](https://cvibe.dev) - Browse prompts and learn more
-- [Model Context Protocol](https://modelcontextprotocol.io) - Learn about MCP
-- [Cursor IDE MCP Guide](https://docs.cursor.com/mcp) - Cursor-specific setup
+- **🌐 [cvibe.dev](https://cvibe.dev)** - Browse free prompts, submit your own
+- **💬 [Join Discord](https://discord.gg/xtzRyfky)** - Get help, share prompts, connect with developers
+- **📂 [GitHub](https://github.com/cvibe-MCP/)** - Contribute to the open source project
+- **📖 [MCP Documentation](https://modelcontextprotocol.io)** - Learn about Model Context Protocol
+
+## 🚀 Get Started Now
+
+1. **[Visit cvibe.dev](https://cvibe.dev)** to browse free prompts
+2. **Configure MCP** using the setup above
+3. **Join our [Discord community](https://discord.gg/xtzRyfky)** for support
+4. **Share your own prompts** and help grow the community
 
 ## 🐛 Issues & Support
 
-- **Bug Reports**: [GitHub Issues](https://github.com/CVibe-MCP/mcp/issues)
-- **Feature Requests**: [GitHub Discussions](https://github.com/CVibe-MCP/mcp/discussions)
-- **Community**: [Discord](https://discord.gg/cvibe) - Join real-time discussions
+- **Bug Reports**: [GitHub Issues](https://github.com/cvibe-MCP/mcp/issues)
+- **Feature Requests**: [GitHub Discussions](https://github.com/cvibe-MCP/mcp/discussions)
+- **Community Help**: [Discord](https://discord.gg/xtzRyfky) - Real-time support from developers
 
 ## 📄 License
 
@@ -168,10 +185,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Built for the CVibe community
+- Built for the cvibe community
 - Powered by [Model Context Protocol](https://modelcontextprotocol.io)
 - Inspired by the npm ecosystem
 
 ---
 
-**Made with ❤️ for developers who are tired of reinventing prompts**
+**🎯 Ready to stop reinventing prompts? [Start browsing free prompts on cvibe.dev →](https://cvibe.dev)**
+
+**Made with ❤️ by developers, for developers who value their time**
